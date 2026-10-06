@@ -2,6 +2,7 @@
 import express from "express";
 import cors from "cors";
 import documentRoutes from "./modules/documents/document.routes.js";
+import jobRoutes from "./modules/jobs/job.routes.js";
 const app = express();
 
 app.use(cors());
@@ -14,4 +15,5 @@ app.get("/health", (_req, res) => {
   });
 });
 app.use("/api/documents", documentRoutes);
+app.use("/api/jobs", jobRoutes);
 export default app;

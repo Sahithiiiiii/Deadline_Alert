@@ -14,7 +14,16 @@ const worker = new Worker<DocumentJobData>(
     console.log(`User: ${userId}`);
 
     // Simulate a time-consuming operation
-    await new Promise((resolve) => setTimeout(resolve, 5000));
+    await job.updateProgress(25);
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+
+    await job.updateProgress(50);
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+
+    await job.updateProgress(75);
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+
+    await job.updateProgress(100);
 
     console.log(`Document ${documentId} processed successfully`);
 

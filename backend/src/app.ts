@@ -1,7 +1,7 @@
 
 import express from "express";
 import cors from "cors";
-
+import documentRoutes from "./modules/documents/document.routes.js";
 const app = express();
 
 app.use(cors());
@@ -13,5 +13,5 @@ app.get("/health", (_req, res) => {
     message: "ActionLens API is running",
   });
 });
-
+app.use("/api/documents", documentRoutes);
 export default app;

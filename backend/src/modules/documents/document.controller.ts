@@ -6,9 +6,9 @@ export const createDocumentJob = async (
   res: Response
 ) => {
   try {
-    const { documentId, fileName, userId } = req.body;
+    const { documentId, fileName, userId, filePath} = req.body;
 
-    if (!documentId || !fileName || !userId) {
+    if (!documentId || !fileName || !userId || !filePath) {
       return res.status(400).json({
         message: "documentId, fileName and userId are required",
       });
@@ -20,6 +20,7 @@ export const createDocumentJob = async (
     documentId,
     fileName,
     userId,
+    filePath,
   },
   {
     attempts: 3,

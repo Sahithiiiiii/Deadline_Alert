@@ -11,5 +11,7 @@ export const getJobStatus = async (jobId: string) => {
     jobId: job.id,
     status: await job.getState(),
     progress: job.progress,
+    failedReason: job.failedReason,
+    attemptsMade: job.attemptsMade,
   };
 };

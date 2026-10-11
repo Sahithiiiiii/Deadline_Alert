@@ -10,5 +10,19 @@ services:
     command: redis-server --appendonly yes
     restart: unless-stopped
 
+  postgres:
+    image: postgres:17-alpine
+    container_name: actionlens-postgres
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_USER: actionlens
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: actionlens
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
 volumes:
   redis_data:
+  postgres_data:

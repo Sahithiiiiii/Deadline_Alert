@@ -6,7 +6,9 @@ const worker = new Worker<DocumentJobData>(
   "document-processing",
 
   async (job) => {
-    console.log(`Processing job: ${job.id}`);
+    console.log(
+  `📄 Job ${job.id} started (attempt ${job.attemptsMade + 1}/${job.opts.attempts ?? 1})`
+    );
 
     const { documentId, fileName, userId } = job.data;
 
@@ -24,6 +26,7 @@ const worker = new Worker<DocumentJobData>(
     await new Promise((resolve) => setTimeout(resolve, 1000));
 
     await job.updateProgress(100);
+
 
     console.log(`Document ${documentId} processed successfully`);
 
@@ -46,9 +49,29 @@ worker.on("completed", (job) => {
   console.log(`Job ${job.id} completed`);
 });
 
+
 worker.on("failed", (job, error) => {
-  console.error(`Job ${job?.id} failed:`, error.message);
+  if (!job) {
+    console.error("A job failed, but its details are unavailable:", error.message);
+    return;
+  }
+
+  const attemptsMade = job.attemptsMade;
+  const maxAttempts = job.opts.attempts ?? 1;
+
+  console.error(
+    `❌ Job ${job.id} failed on attempt ${attemptsMade}/${maxAttempts}: ${error.message}`
+  );
+
+  if (attemptsMade < maxAttempts) {
+    console.log(
+      `🔁 Job ${job.id} will be retried. Next attempt: ${attemptsMade + 1}/${maxAttempts}`
+    );
+  } else {
+    console.error(`🚫 Job ${job.id} exhausted all retry attempts.`);
+  }
 });
+
 
 worker.on("error", (error) => {
   console.error("Worker error:", error);

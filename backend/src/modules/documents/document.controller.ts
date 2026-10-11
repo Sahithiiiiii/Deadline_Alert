@@ -14,11 +14,21 @@ export const createDocumentJob = async (
       });
     }
 
-    const job = await documentQueue.add("process-document", {
-      documentId,
-      fileName,
-      userId,
-    });
+    const job = await documentQueue.add(
+  "process-document",
+  {
+    documentId,
+    fileName,
+    userId,
+  },
+  {
+    attempts: 3,
+    backoff: {
+      type: "fixed",
+      delay: 2000,
+    },
+  }
+  );
 
     return res.status(202).json({
       message: "Document queued successfully",

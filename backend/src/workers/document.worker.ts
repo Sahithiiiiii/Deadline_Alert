@@ -4,6 +4,7 @@ import { Worker } from "bullmq";
 import type { DocumentJobData } from "../queues/queue.types.js";
 import { PDFParse } from "pdf-parse";
 import { readFile } from "node:fs/promises";
+import { extractDeadlines } from "../modules/ai/deadline.service.js";
 
 const worker = new Worker<DocumentJobData>(
   "document-processing",
@@ -33,6 +34,12 @@ const worker = new Worker<DocumentJobData>(
       // Extract text from the PDF
       const result = await parser.getText();
       const extractedText = result.text;
+      const deadlineResult = await extractDeadlines(extractedText);
+
+      console.log(
+        "Extracted deadlines:",
+        JSON.stringify(deadlineResult.deadlines, null, 2)
+      );
 
       if (!extractedText.trim()) {
         throw new Error("No text found in the PDF");
@@ -52,6 +59,7 @@ const worker = new Worker<DocumentJobData>(
         fileName,
         userId,
         extractedTextLength: extractedText.length,
+        deadlines: deadlineResult.deadlines,
         message: "PDF extraction completed",
       };
     } finally {

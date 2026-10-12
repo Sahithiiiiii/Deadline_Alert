@@ -13,16 +13,21 @@ enum DocumentStatus {
   COMPLETED
   FAILED
 }
+enum DeadlineStatus {
+  PENDING
+  COMPLETED
+  EXPIRED
+}
 
 model User {
-  id           String     @id @default(uuid()) @db.Uuid
-  name         String
-  email        String     @unique
-  passwordHash String
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
-
-  documents    Document[]
+  id            String         @id @default(uuid()) @db.Uuid
+  name          String
+  email         String         @unique
+  passwordHash  String
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  documents     Document[]
+  notifications Notification[]
 }
 
 model Document {
@@ -41,18 +46,43 @@ model Document {
 }
 
 model Deadline {
-  id         String   @id @default(uuid()) @db.Uuid
-  event      String
-  date       DateTime @db.Date
-  time       String?
-  timezone   String?
-  evidence   String   @db.Text
-  confidence Float
-  createdAt  DateTime @default(now())
+  id                    String         @id @default(uuid()) @db.Uuid
+  event                 String
+  date                  DateTime       @db.Date
+  time                  String?
+  timezone              String?
+  evidence              String         @db.Text
+  confidence            Float
+  createdAt             DateTime       @default(now())
+  documentId            String         @db.Uuid
+  document              Document       @relation(fields: [documentId], references: [id], onDelete: Cascade)
 
-  documentId String   @db.Uuid
-  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  status                DeadlineStatus @default(PENDING)
+  reminderLeadMinutes   Int            @default(120)
+  repeatIntervalMinutes Int            @default(30)
+  completedAt           DateTime?
+  nextReminderAt        DateTime?
+
+  notifications         Notification[]
 
   @@index([date])
   @@index([documentId])
+  @@index([status, nextReminderAt])
+}
+model Notification {
+  id         String    @id @default(uuid()) @db.Uuid
+  title      String
+  message    String    @db.Text
+  readAt     DateTime?
+  emailSentAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  userId     String    @db.Uuid
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  deadlineId String?   @db.Uuid
+  deadline   Deadline? @relation(fields: [deadlineId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([deadlineId])
 }

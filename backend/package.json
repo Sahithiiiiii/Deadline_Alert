@@ -8,7 +8,8 @@
     "build": "tsc",
     "start": "node dist/server.js",
     "typecheck": "tsc --noEmit",
-    "worker": "tsx watch src/workers/document.worker.ts"
+    "worker": "tsx watch src/workers/document.worker.ts",
+    "reminder-worker": "tsx watch src/workers/reminder.worker.ts"
   },
   "keywords": [],
   "author": "",

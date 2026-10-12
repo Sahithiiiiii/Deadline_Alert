@@ -7,7 +7,7 @@ import { PDFParse } from "pdf-parse";
 import { readFile } from "node:fs/promises";
 import { extractDeadlines } from "../modules/ai/deadline.service.js";
 import { prisma } from "../lib/prisma.js";
-
+import { scheduleReminder } from "../modules/reminders/reminder.scheduler.js";
 const worker = new Worker<DocumentJobData>(
   "document-processing",
 
@@ -132,6 +132,59 @@ const worker = new Worker<DocumentJobData>(
           },
         });
       });
+      const savedDeadlines = await prisma.deadline.findMany({
+  where: { documentId },
+});
+
+for (const deadline of savedDeadlines) {
+  if (deadline.status !== "PENDING") continue;
+
+  if (!deadline.time) {
+    console.warn(
+      `Skipping reminder for "${deadline.event}": deadline time is missing.`,
+    );
+    continue;
+  }
+
+  const timezone = deadline.timezone || "Asia/Kolkata";
+
+  // Parse the local deadline time in its specified timezone.
+  const deadlineDateTime = new Date(
+    `${deadline.date.toISOString().slice(0, 10)}T${deadline.time}:00`,
+  );
+
+  // Temporary timezone handling for Asia/Kolkata.
+  // We'll make this timezone-safe for all supported timezones next.
+  const deadlineInstant = new Date(
+    deadlineDateTime.getTime() - 5.5 * 60 * 60 * 1000,
+  );
+
+  const reminderAt = new Date(
+    deadlineInstant.getTime() -
+      deadline.reminderLeadMinutes * 60 * 1000,
+  );
+
+  if (reminderAt.getTime() <= Date.now()) {
+    console.warn(
+      `Skipping first reminder for "${deadline.event}": reminder time has passed.`,
+    );
+    continue;
+  }
+
+  await prisma.deadline.update({
+    where: { id: deadline.id },
+    data: { nextReminderAt: reminderAt },
+  });
+
+  await scheduleReminder({
+    deadlineId: deadline.id,
+    reminderAt,
+  });
+
+  console.log(
+    `⏰ Scheduled reminder for "${deadline.event}" at ${reminderAt.toISOString()} (${timezone})`,
+  );
+}
 
       await job.updateProgress(100);
 

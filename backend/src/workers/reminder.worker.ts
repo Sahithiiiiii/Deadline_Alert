@@ -1,9 +1,10 @@
 
 import "dotenv/config";
-import { Worker, DelayedError } from "bullmq";
+import { Worker } from "bullmq";
 import type { Job } from "bullmq";
 import { prisma } from "../lib/prisma.js";
 import reminderQueue from "../queues/reminder.queue.js";
+import emailQueue from "../queues/email.queue.js";
 
 interface ReminderJobData {
   deadlineId: string;
@@ -55,38 +56,83 @@ const worker = new Worker<ReminderJobData>(
       return;
     }
 
-    const notification = await prisma.notification.create({
-      data: {
+    const title = "Upcoming deadline";
+    const message = `"${deadline.event}" is due at ${deadline.time} on ${datePart}.`;
+    const existingNotification = await prisma.notification.findFirst({
+      where: {
         userId: deadline.document.userId,
         deadlineId,
-        title: "Upcoming deadline",
-        message: `"${deadline.event}" is due at ${deadline.time} on ${datePart}.`,
+        title,
+        message,
+        createdAt: { gte: new Date(job.timestamp) },
       },
+      orderBy: { createdAt: "asc" },
     });
+    const notification =
+      existingNotification ??
+      (await prisma.notification.create({
+        data: {
+          userId: deadline.document.userId,
+          deadlineId,
+          title,
+          message,
+        },
+      }));
 
-    console.log(`Created in-app notification ${notification.id}`);
+    console.log(
+      `${existingNotification ? "Reusing" : "Created"} in-app notification ${notification.id}`,
+    );
+    const emailJob = await emailQueue.add(
+      "send-reminder-email",
+      {
+        notificationId: notification.id,
+        to: deadline.document.user.email,
+        subject: `ActionLens Reminder: ${deadline.event}`,
+        text: `
+Hello ${deadline.document.user.name},
+
+This is a reminder about your upcoming deadline.
+
+Deadline: ${deadline.event}
+Date: ${datePart}
+Time: ${deadline.time}
+
+Please complete the required task before the deadline.
+
+— ActionLens
+  `.trim(),
+      },
+      {
+        jobId: `deadline-reminder-email-${deadlineId}-${job.timestamp}`,
+      },
+    );
+    console.log(`Email job ${emailJob.id} queued for deadline ${deadlineId}`);
 
     const nextReminderAt = new Date(
       now.getTime() + deadline.repeatIntervalMinutes * 60 * 1000,
     );
 
     if (nextReminderAt < dueAt) {
-      await prisma.deadline.updateMany({
+      const update = await prisma.deadline.updateMany({
         where: { id: deadlineId, status: "PENDING" },
         data: { nextReminderAt },
       });
 
-      await reminderQueue.add(
-        "send-deadline-reminder",
-        { deadlineId },
-        {
-          delay: Math.max(0, nextReminderAt.getTime() - Date.now()),
-          jobId: `deadline-reminder-${deadlineId}-${nextReminderAt.getTime()}`,
-          removeOnComplete: true,
-        },
-      );
+      if (update.count === 1) {
+        await reminderQueue.add(
+          "send-deadline-reminder",
+          { deadlineId },
+          {
+            delay: Math.max(0, nextReminderAt.getTime() - Date.now()),
+            jobId: `deadline-reminder-${deadlineId}-${nextReminderAt.getTime()}`,
+            removeOnComplete: true,
+          },
+        );
 
-      console.log(`Next reminder scheduled for ${nextReminderAt.toISOString()}`);
+        console.log(`Next reminder scheduled for ${nextReminderAt.toISOString()}`);
+      } else {
+        console.log(`Deadline ${deadlineId} is no longer pending; not rescheduling.`);
+      }
     } else {
       await prisma.deadline.updateMany({
         where: { id: deadlineId, status: "PENDING" },
